@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 
+const API_URL = 'https://ai-resume-analyzer-da6d.onrender.com'
+
 function App() {
   const [file, setFile] = useState(null)
   const [jobDescription, setJobDescription] = useState('')
@@ -29,7 +31,7 @@ function App() {
       formData.append('file', file)
 
       const uploadResponse = await fetch(
-        'http://127.0.0.1:8000/api/resume/upload',
+        `${API_URL}/api/resume/upload`,
         {
           method: 'POST',
           body: formData,
@@ -37,14 +39,18 @@ function App() {
       )
 
       if (!uploadResponse.ok) {
-        throw new Error('Resume upload failed.')
+        const errorData = await uploadResponse.json().catch(() => ({}))
+
+        throw new Error(
+          errorData.detail || 'Resume upload failed.'
+        )
       }
 
       const uploadData = await uploadResponse.json()
 
       // Step 2: Analyze resume with job description
       const analyzeResponse = await fetch(
-        'http://127.0.0.1:8000/api/resume/analyze',
+        `${API_URL}/api/resume/analyze`,
         {
           method: 'POST',
           headers: {
@@ -58,7 +64,8 @@ function App() {
       )
 
       if (!analyzeResponse.ok) {
-        const errorData = await analyzeResponse.json()
+        const errorData = await analyzeResponse.json().catch(() => ({}))
+
         throw new Error(
           errorData.detail || 'Resume analysis failed.'
         )
@@ -68,7 +75,10 @@ function App() {
 
       setResult(analysisData)
     } catch (err) {
-      setError(err.message)
+      setError(
+        err.message ||
+          'Something went wrong. Please try again.'
+      )
     } finally {
       setLoading(false)
     }
@@ -94,6 +104,7 @@ function App() {
             onChange={(e) => {
               setFile(e.target.files[0])
               setError('')
+              setResult(null)
             }}
           />
 
@@ -109,7 +120,10 @@ function App() {
             rows="8"
             placeholder="Paste the job description here..."
             value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
+            onChange={(e) => {
+              setJobDescription(e.target.value)
+              setError('')
+            }}
           />
 
           <button
@@ -133,6 +147,7 @@ function App() {
 
             <div className="score-card">
               <h3>Match Score</h3>
+
               <div className="score">
                 {result.match_score}%
               </div>
@@ -143,22 +158,26 @@ function App() {
 
               <p>
                 <strong>Name:</strong>{' '}
-                {result.candidate_information?.name || 'Not provided'}
+                {result.candidate_information?.name ||
+                  'Not provided'}
               </p>
 
               <p>
                 <strong>Email:</strong>{' '}
-                {result.candidate_information?.email || 'Not provided'}
+                {result.candidate_information?.email ||
+                  'Not provided'}
               </p>
 
               <p>
                 <strong>Phone:</strong>{' '}
-                {result.candidate_information?.phone || 'Not provided'}
+                {result.candidate_information?.phone ||
+                  'Not provided'}
               </p>
 
               <p>
                 <strong>Location:</strong>{' '}
-                {result.candidate_information?.location || 'Not provided'}
+                {result.candidate_information?.location ||
+                  'Not provided'}
               </p>
             </div>
 
@@ -167,9 +186,11 @@ function App() {
 
               {result.matching_skills?.length > 0 ? (
                 <ul>
-                  {result.matching_skills.map((skill, index) => (
-                    <li key={index}>{skill}</li>
-                  ))}
+                  {result.matching_skills.map(
+                    (skill, index) => (
+                      <li key={index}>{skill}</li>
+                    )
+                  )}
                 </ul>
               ) : (
                 <p>No matching skills found.</p>
@@ -181,9 +202,11 @@ function App() {
 
               {result.missing_skills?.length > 0 ? (
                 <ul>
-                  {result.missing_skills.map((skill, index) => (
-                    <li key={index}>{skill}</li>
-                  ))}
+                  {result.missing_skills.map(
+                    (skill, index) => (
+                      <li key={index}>{skill}</li>
+                    )
+                  )}
                 </ul>
               ) : (
                 <p>No missing skills found.</p>
