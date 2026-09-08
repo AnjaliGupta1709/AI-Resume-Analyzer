@@ -1,12 +1,22 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
-import requests
+import os
+from groq import Groq
 
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "llama3.2"
-
-
+MODEL_NAME = "openai/gpt-oss-20b"
 def analyze_resume(resume_text: str, job_description: str):
+
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        raise Exception(
+            "GROQ_API_KEY is not configured. Please add it to your .env file."
+        )
+
+    client = Groq(api_key=api_key)
 
     prompt = f"""
 You are an AI Resume Analyzer.
@@ -38,60 +48,44 @@ Rules:
 - match_score must be a number from 0 to 100.
 - matching_skills must contain skills present in both the resume and job description.
 - missing_skills must contain important skills from the job description that are missing from the resume.
-- improvement_suggestions must contain practical suggestions.
-- Extract candidate information from the resume.
+- improvement_suggestions should contain practical suggestions for improving the resume.
+- Extract candidate information from the resume when available.
 - Return only JSON.
 """
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL_NAME,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a professional resume analyzer. Return only valid JSON."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "stream": False,
-                "format": "json",
-                "keep_alive": "10m",
-                "options": {
-                    "temperature": 0.1
-                }
-            },
-            timeout=60
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional resume analyzer. "
+                        "Return only valid JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
         )
 
-        response.raise_for_status()
-
-        data = response.json()
-
-        result = data["message"]["content"]
+        result = response.choices[0].message.content
 
         return json.loads(result)
-
-    except requests.exceptions.ConnectionError:
-        raise Exception(
-            "Ollama is not running. Please start Ollama and try again."
-        )
-
-    except requests.exceptions.Timeout:
-        raise Exception(
-            "AI analysis timed out. Please try again."
-        )
 
     except json.JSONDecodeError:
         raise Exception(
             "AI returned an invalid JSON response."
         )
 
-    except requests.exceptions.RequestException as e:
+       
+
+    except Exception as e:
+        print("GROQ ERROR:", repr(e))
         raise Exception(
-            f"Ollama request failed: {str(e)}"
+            f"Groq AI analysis failed: {str(e)}"
         )
